@@ -12,9 +12,9 @@ from scipy.spatial import ConvexHull
 
 
 # Globals
-xMax = 100       # Width of reference image in pixels
-yMax = 100       # Height of reference image in pixels
-period = 3000     # Time period (in milliseconds) to calculate convex hull area
+X_MAX = 100       # Width of reference image in pixels
+Y_MAX = 100       # Height of reference image in pixels
+PERIOD = 3000     # Time period (in milliseconds) to calculate convex hull area
 
 
 # Read in the data file (note that header names are important at this time)
@@ -24,32 +24,50 @@ data = pd.read_excel('DummyData.xlsx', header = 0)
 points = data.iloc[:, :2]
 
 # Normalize coordinates based upon image size
-imageSize = [xMax, yMax]
+imageSize = [X_MAX, Y_MAX]
 points = points/imageSize
 
-# Select first time period
-ttime = data['totaltime']
-startRow = 0
-row = startRow
+"""
+# Define the getFinishRow function
+def getFinishRow(times, startRow, period):
+    finishRow = 0
+    for row in range(startRow, len(times)):
+        if times.iloc[row] - times.iloc[startRow] > period:
+            finishRow = row -1
+            break
+    return finishRow
+"""
 
-for timestamp in ttime:
-    if timestamp > period:
-        finishRow = row -1
-#        row = ttime[ttime == timestamp].index[0]
-        print(finishRow)
-        print(ttime[finishRow])
-        break
-    row += 1
+# Define the getStartRow function
+def getStartRow(times, finishRow, period):
+    startRow = False
+    for row in range(finishRow, -1, -1):
+        if times.iloc[finishRow] - times.iloc[row] > period:
+            startRow = row + 1
+            break
+    return startRow
+   
+# Calculate time steps
+times = data['totaltime']
 
+for row in range(len(times) - 1, -1, -1):
+    startRow = getStartRow(times, row, PERIOD)
+    if(startRow):
+        data.set_value(row, 'startRow', startRow)
+        data.set_value(row, 'rowCount', row - startRow)
+        data.set_value(row, 'period', times.iloc[row] - times.iloc[startRow])
+
+"""
+# Plot only the points within the time period
 plotPoints = points[startRow:finishRow+1]
 plotPoints = plotPoints.as_matrix()
 
 # Draw convex hull for first time period
 hull = ConvexHull(plotPoints)
 
-plotPoints[:,0]
-
-
+plt.title(str(finishTime) + " ms")
 plt.plot(plotPoints[:,0], plotPoints[:,1], 'o')
 for simplex in hull.simplices:
     plt.plot(plotPoints[simplex, 0], plotPoints[simplex, 1], 'k-')
+
+"""
