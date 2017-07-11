@@ -80,10 +80,12 @@ areaLine, = ax2.plot([], [], label = 'Convex Hull Area')
 avgLine, = ax2.plot([], [], linestyle='--', label = 'Average Area')
 
 # Initialize the average line label
-avgLabel = ax2.text(0, 0, '%', horizontalalignment='left', verticalalignment='center')
+avgLabel = ax2.text(0, 0, '%', horizontalalignment='left',
+                    verticalalignment='center')
 
-# Initialize the elapsed time label in the bottom right corner of the right subplot
-timeLabel = ax2.text(0, 0, '', horizontalalignment='right', verticalalignment='bottom')
+# Initialize the time label in the bottom right corner of the right subplot
+timeLabel = ax2.text(0, 0, '', horizontalalignment='right',
+                     verticalalignment='bottom')
 
 # Create the legend in the top right corner of the right subplot
 ax2.legend(loc=1)
@@ -113,7 +115,9 @@ def update(frame):
         ax1.set_ylabel('Y Coordinate (normalized)')
         
         # Set the subplot title to frameRange
-        ax1.title.set_text('Fixation #\'s: ' + str(int(row['startRow'])) +' - ' + str(frame) + '\nPeriod: ' + str(row['period'])[0:6] + ' milliseconds')
+        ax1.title.set_text('Fixation #\'s: ' + str(int(row['startRow'])) +
+                           ' - ' + str(frame) + '\nPeriod: ' +
+                           str(row['period'])[0:6] + ' milliseconds')
         ax1.plot(plotPoints[:,0], plotPoints[:,1], 'o')
         
         # Draw the convex hull in the left subplot
