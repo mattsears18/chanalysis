@@ -154,7 +154,6 @@ animation = animation.FuncAnimation(fig1,
 ts = time.time()
 dt = datetime.datetime.fromtimestamp(ts).strftime('%y%m%d.%H%M%S')
 
-"""
+
 animation.save('chull_animation' + str(dt) + '.mp4', fps=5,
                extra_args=['-vcodec', 'libx264'])
-"""
