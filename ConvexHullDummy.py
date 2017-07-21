@@ -14,38 +14,23 @@ from scipy.spatial import ConvexHull
 import time
 import datetime
 from pylab import rcParams
-from sklearn import preprocessing
 
 
 # CONSTANTS
-X_MAX = 0       # Width of reference image (set to 0 for automatic)
-#X_MIN = 0       # TODO
-Y_MAX = 0       # Height of reference image (set to 0 for automatic)
-#Y_MIN = 0       # TODO
-PERIOD = 3000   # Time period (in milliseconds) to calculate convex hull area
+X_MAX = 100       # Width of reference image
+Y_MAX = 100       # Height of reference image
+PERIOD = 3000     # Time period (in milliseconds) to calculate convex hull area
 
-participantNum = '01'
 
 # Read in the data file (note that header names are important at this time)
-data = pd.read_excel("BeGaze Data/Participant " + participantNum + " - Spool 05.xlsx", header = 0)
-
-# Rename the columns
-data.columns = ['totaltime', 'timestampHMS', 'index', 'x', 'y', 'aoi']
+data = pd.read_excel('DummyData.xlsx', header = 0)
 
 # Select only the x and y coordinates
-points = data.iloc[:, 3:5]
+points = data.iloc[:, :2]
 
-# Normalize the points
-# If image size isn't defined
-if X_MAX == 0:
-    min_max_scaler = preprocessing.MinMaxScaler()
-    points['x'] = min_max_scaler.fit_transform(data['x'])
-    points['y'] = min_max_scaler.fit_transform(data['y'])
-else:
-    # If image size is defined
-    imageSize = [X_MAX, Y_MAX]    
-    points = points/imageSize    
-
+# Normalize coordinates based upon image size
+imageSize = [X_MAX, Y_MAX]
+points = points/imageSize
 
 # Define the getTimeSec function
 def getTimeSec(time):
@@ -85,9 +70,6 @@ fig1, (ax1, ax2) = plt.subplots(1, 2, sharey=False)
 
 # Increase whitespace between the subplots
 fig1.subplots_adjust(wspace=0.35)
-
-# Set the figure title
-fig1.suptitle('Participant ' + participantNum)
 
 # Set Axes labels of the right subplot (the line graph)
 ax2.set_xlabel('Time (milliseconds)')
@@ -184,6 +166,5 @@ ts = time.time()
 dt = datetime.datetime.fromtimestamp(ts).strftime('%y%m%d.%H%M%S')
 
 
-animation.save('animations/participant' + participantNum + '_' +
-               str(PERIOD) + '_' + str(dt) + '.mp4', fps=5,
-               extra_args=['-vcodec', 'libx264'])
+#animation.save('chull_animation' + str(dt) + '.mp4', fps=5,
+#               extra_args=['-vcodec', 'libx264'])
