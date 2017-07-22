@@ -25,7 +25,7 @@ Y_MAX = 0       # Height of reference image (set to 0 for automatic)
 PERIOD = 3000   # Time period (in milliseconds) to calculate convex hull area
 
 # All other global vars
-participantNum = 2
+participantNum = 1
 spools = range(1,11)
 
 
@@ -58,8 +58,8 @@ def doCalculations(spool):
     if type(allData) is int:
         print('no data')
         # Data doesn't exist. Read the file.
-        allData = pd.read_excel("BeGaze Data/Participant " + participantNumTxt
-                             + ".xlsx", header = 0)
+        allData = pd.read_table("BeGaze Data/Raw Data/Participant " + participantNumTxt
+                     + ".txt", delimiter = ',')
             
         # Rename the columns
         allData.columns = ['totaltime', 'timestampHMS', 'category',
@@ -256,8 +256,8 @@ def doCalculations(spool):
         dt = datetime.datetime.fromtimestamp(ts).strftime('%y%m%d.%H%M%S')
         
         
-        anim.save('animations/participant' + participantNumTxt + '_spool'
-                       + spoolTxt + '_' + str(PERIOD) + '_' + str(dt) + '.mp4',
+        anim.save('animations/participant' + participantNumTxt + '_' + str(PERIOD)
+                       + '_spool' + spoolTxt + '_' + str(dt) + '.mp4',
                        fps=5, extra_args=['-vcodec', 'libx264'])
 
 # Finally, do the calculations
