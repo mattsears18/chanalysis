@@ -183,10 +183,10 @@ def doCalculations():
                             if((row['rowCount'] > 2) & (len(plotPoints.drop_duplicates()) > 2)):
                                 plotPoints = plotPoints.as_matrix()
                                 
-                                print('partic: ' + participantNumTxt
-                                      + '  dwg: ' + dwgTxt + '  PERIOD: '
-                                      + str(PERIOD) + '  frame: ' + str(frame)
-                                      + '  len:' + str(len(plotPoints))
+                                print('PERIOD: ' + str(PERIOD) + '  partic: '
+                                      + participantNumTxt + '  dwg: ' + dwgTxt
+                                      + '  frame: ' + str(frame) + '  len:'
+                                      + str(len(plotPoints))
                                       + '  enough points')
                             
                                 # Enough points exist to calculate the hull
@@ -213,10 +213,10 @@ def doCalculations():
                                              plotPoints[simplex, 1], 'k-')
                                 
                             else:
-                                print('partic: ' + participantNumTxt
-                                      + '  dwg: ' + dwgTxt + '  PERIOD: '
-                                      + str(PERIOD) + '  frame: ' + str(frame)
-                                      + '  len:' + str(len(plotPoints))
+                                print('PERIOD: ' + str(PERIOD) +'  partic: '
+                                      + participantNumTxt + '  dwg: ' + dwgTxt
+                                      + '  frame: ' + str(frame) + '  len:'
+                                      + str(len(plotPoints))
                                       + '  NOT ENOUGH POINTS!!!')
                                 
                                 # Not enough points to calculat the hull, set area to zero
