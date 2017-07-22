@@ -262,9 +262,10 @@ def doCalculations(spool):
                 dt = datetime.datetime.fromtimestamp(ts).strftime('%y%m%d.%H%M%S')
                 
                 
-                anim.save('animations/participant' + participantNumTxt + '_' + str(PERIOD)
-                               + '_spool' + spoolTxt + '_' + str(dt) + '.mp4',
-                               fps=5, extra_args=['-vcodec', 'libx264'])
+                anim.save('animations/' + str(PERIOD) + '_participant'
+                          + participantNumTxt + '_spool' + spoolTxt + '_'
+                          + str(dt) + '.mp4', fps=5,
+                          extra_args=['-vcodec', 'libx264'])
 
 # Finally, do the calculations
 for spool in spools:
