@@ -26,7 +26,8 @@ PERIODS = [3000]   # Time periods (in milliseconds) to calculate convex hull are
 
 # All other global vars
 participantNums = range(1,2)
-dwgs = range(1,11)
+dwgs = range(1,2)
+highRes = False    # Setting to True will require ~20x processing time
 
 
 
@@ -60,6 +61,7 @@ def doCalculations():
     global results
     global average
     global finalTime
+    global highRes
     
     for PERIOD in PERIODS:    
         for participantNum in participantNums:     
@@ -109,8 +111,10 @@ def doCalculations():
                 # Only proceed if there are fixations for the dwg
                 if(len(data.index) > 10):
             
-                    # Keep only the first row for each fixation
-                    data = data.drop_duplicates(subset = 'index', keep = 'first')
+                    if(not highRes):
+                        # Keep only the first row for each fixation
+                        data = data.drop_duplicates(subset = 'index', keep = 'first')
+                        
                     data.reset_index(inplace = True)  
                     
                     
