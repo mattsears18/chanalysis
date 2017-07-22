@@ -25,7 +25,7 @@ Y_MAX = 0       # Height of reference image (set to 0 for automatic)
 PERIODS = [3000]   # Time periods (in milliseconds) to calculate convex hull areas
 
 # All other global vars
-participantNums = range(1,21)
+participantNums = range(1,2)
 dwgs = range(1,11)
 
 
@@ -39,13 +39,27 @@ dwgs = range(1,11)
 
 
 
+
 # Initialize the data variable as global
 allData = 0
 
+# Initialize results
+results = pd.DataFrame(columns = ['period', 'participant', 'dwg',
+                                  'avgHullArea', 'totalTime'])
+
+# Initialize average
+average = 0
+
+# Initialize finalTime
+finalTime = 0
+
 # Define the doCalculations function
 def doCalculations():
-    # Use the global data variable
+    # Use the global variables
     global allData
+    global results
+    global average
+    global finalTime
     
     for PERIOD in PERIODS:    
         for participantNum in participantNums:     
@@ -173,7 +187,10 @@ def doCalculations():
                     # Create the legend in the top right corner of the right subplot
                     ax2.legend(loc=1)
                         
-                    def update(frame):            
+                    def update(frame):     
+                        global average
+                        global finalTime
+                        
                         row = data.iloc[frame,:]
                         
                         if(not np.isnan(row['startRow'])):
@@ -252,6 +269,8 @@ def doCalculations():
                             # Update the time in the bottom right corner of the right plot
                             timeLabel.set_position((data.loc[frame, 'totaltime'], 0))        
                             timeLabel.set_text(str(row['totaltimesec'])[0:6] + ' seconds')
+                            
+                            finalTime = row['totaltimesec']
                     
                     
                     # Animate the plots
@@ -271,9 +290,22 @@ def doCalculations():
                               + participantNumTxt + '_dwg' + dwgTxt + '_'
                               + str(dt) + '.mp4', fps=5,
                               extra_args=['-vcodec', 'libx264'])
+                    
+                    # Append this result to results
+                    result = {'period': PERIOD,
+                              'participant': participantNum,
+                              'dwg': dwg,
+                              'avgHullArea': average,
+                              'totalTime': finalTime}
+                    
+                    results = results.append(result, ignore_index=True)
+                    
+    # Write results to excel file
+    writer = pd.ExcelWriter('results' + str(dt) + '.xlsx',
+                            engine='xlsxwriter')
+    
+    results.to_excel(writer, sheet_name='Sheet1')
+    writer.save()
 
 # Finally, do the calculations
-
 doCalculations()
-    
-#doCalculations(6)
