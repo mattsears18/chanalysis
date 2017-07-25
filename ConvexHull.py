@@ -17,9 +17,9 @@ from pylab import rcParams
 from sklearn import preprocessing
 
 
-periods = [3000]  # Time periods (in milliseconds) to calculate convex hull areas
-participantNums = range(1,2)
-dwgs = range(1,2)
+periods = [3000]  # Time periods (in ms) to calculate convex hull areas
+participantNums = range(1, 2)
+dwgs = range(1, 2)
 
 partThresh = 3000  # DWG Viewing Time Threshold (ms)
 partPointMin = 20  # Minimum # of points required to make a part
@@ -38,9 +38,12 @@ fileSuffix = ".txt"
 
 
 
+
 # Initialize results
 results = pd.DataFrame(columns = ['period', 'participant', 'dwg', 'part',
-                                  'avgHullArea', 'totalTime'])
+                                  'partAvgHullArea', 'partTime',
+                                  'dwgAvgHullArea', 'dwgTime',
+                                  'participantAvgHullArea', 'participantTime'])
 
 
 # Remove all categories except for "Visual Intake"
@@ -88,7 +91,8 @@ def getCleanData(data):
 
 
 def getDwgData(data, dwgNum):
-    return data.loc[data['aoi'] == 'Spool ' + str(dwgNum)].sort_values(by = ['timestamp'])
+    return data.loc[data['aoi'] == 'Spool '
+                    + str(dwgNum)].sort_values(by = ['timestamp'])
 
 
 def getScaledCoordinates(data):
@@ -206,11 +210,14 @@ def getPlotPoints(data, frame):
     return plotPoints
     
     
-def updatePlot(frame, data, startFrame, period, participantNumTxt, dwgNumTxt, partNumTxt):
+def updatePlot(frame, data, startFrame, period, participantNumTxt,
+               dwgNumTxt, partNumTxt):
     global finalTime
     global average
     
-    print('period:' + str(period) + ' participant:' + participantNumTxt + ' dwg:' + dwgNumTxt + ' part:' + partNumTxt + ' frame: ' + str(frame))
+    print('period:' + str(period) + ' participant:' + participantNumTxt
+          + ' dwg:' + dwgNumTxt + ' part:' + partNumTxt
+          + ' frame: ' + str(frame))
     
     row = data.iloc[frame]
     
@@ -229,7 +236,8 @@ def updatePlot(frame, data, startFrame, period, participantNumTxt, dwgNumTxt, pa
                 ax1.plot(plotPoints[:,0], plotPoints[:,1], 'o')
                 
                 for simplex in row['hull'].simplices:
-                    ax1.plot(plotPoints[simplex, 0], plotPoints[simplex, 1], 'k-')
+                    ax1.plot(plotPoints[simplex, 0],
+                             plotPoints[simplex, 1], 'k-')
 
                 # Set the subplot title to frameRange
                 ax1.title.set_text('Fixation #\'s: '
@@ -254,11 +262,13 @@ def updatePlot(frame, data, startFrame, period, participantNumTxt, dwgNumTxt, pa
                     
                     # Update and move the average line label
                     avgLabel.set_text(str(average)[0:5] + '%')
-                    avgLabel.set_position((data.loc[frame, 'partTime'], average))
+                    avgLabel.set_position((data.loc[frame, 'partTime'],
+                                           average))
                     
-                    # Update the time in the bottom right corner of the right plot
+                    # Update the time in the bottom right corner of the plot
                     timeLabel.set_position((data.loc[frame, 'partTime'], 0))
-                    timeLabel.set_text(str(row['partTime']/1000)[0:6] + ' seconds')
+                    timeLabel.set_text(str(row['partTime']/1000)[0:6]
+                                        + ' seconds')
                     
                     finalTime = row['partTime']/1000
         
@@ -332,7 +342,9 @@ def plotAndSave(data, period, participantNumTxt, dwgNumTxt, partNumTxt):
     anim = animation.FuncAnimation(fig1,
                                    func=updatePlot,
                                    frames=range(startFrame, len(data)),
-                                   fargs=(data, startFrame, period, participantNumTxt, dwgNumTxt, partNumTxt),
+                                   fargs=(data, startFrame, period,
+                                          participantNumTxt, dwgNumTxt,
+                                          partNumTxt),
                                    interval=200,
                                    repeat=False)
     
@@ -340,8 +352,6 @@ def plotAndSave(data, period, participantNumTxt, dwgNumTxt, partNumTxt):
               + participantNumTxt + '_dwg' + dwgNumTxt + '_part' + partNumTxt
               + '_' + str(dt) + '.mp4', fps=5,
               extra_args=['-vcodec', 'libx264'])
-    
-    print('finalTime: ' + str(finalTime))
     
 
 def doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
@@ -357,7 +367,8 @@ def doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
             participantNumTxt = str(participantNum).zfill(2)
 
             # Get the participant data
-            participantData = getData(filePrefix, fileSuffix, participantNumTxt)
+            participantData = getData(filePrefix, fileSuffix,
+                                      participantNumTxt)
             # Clean the participant data
             participantData = getCleanData(participantData)
 
@@ -390,18 +401,24 @@ def doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
                     
                     partData = getConvexHulls(partData)
                     
-                    plotAndSave(partData, period, participantNumTxt, dwgNumTxt, partNumTxt)
+                    plotAndSave(partData, period, participantNumTxt, dwgNumTxt,
+                                partNumTxt)
                        
                     # Append this result to results
                     result = {'period': period,
                               'participant': participantNum,
                               'dwg': dwgNum,
                               'part': partNum,
-                              'avgHullArea': average,
-                              'totalTime': finalTime}
+                              'partAvgHullArea': average,
+                              'partTime': finalTime}
                     
                     results = results.append(result, ignore_index=True)
-                    
+               
+    
+    # Change dtype to integers            
+    results = results.astype(dtype = {'period': np.int, 'participant': np.int,
+                                      'dwg': np.int, 'part': np.int})
+    
     # Make a timestamp for unique movie filenames
     ts = time.time()
     dt = datetime.datetime.fromtimestamp(ts).strftime('%y%m%d.%H%M%S')
@@ -415,8 +432,8 @@ def doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
                     
 
 # Finally, call doCalculations
-doCalculations(periods, participantNums, dwgs, partThresh, partPointMin, filePrefix,
-               fileSuffix)
+doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
+               filePrefix, fileSuffix)
 
 
 
@@ -435,14 +452,14 @@ doCalculations(periods, participantNums, dwgs, partThresh, partPointMin, filePre
 ######### for testing only
 #########
 
-period=3000
-participantNum=1
-dwgNum=1
-partNum=1
-i=0
-data=partData
-frame=12
-startFrame=7
+#period=3000
+#participantNum=1
+#dwgNum=1
+#partNum=1
+#i=0
+#data=partData
+#frame=12
+#startFrame=7
 
 #########
 ######### for testing only
