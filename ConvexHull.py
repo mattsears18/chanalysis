@@ -17,17 +17,15 @@ from pylab import rcParams
 from sklearn import preprocessing
 
 
-# CONSTANTS
-X_MAX = 0       # Width of reference image (set to 0 for automatic)
-#X_MIN = 0       # TODO
-Y_MAX = 0       # Height of reference image (set to 0 for automatic)
-#Y_MIN = 0       # TODO
-PERIODS = [3000]   # Time periods (in milliseconds) to calculate convex hull areas
-
-# All other global vars
+periods = [3000]  # Time periods (in milliseconds) to calculate convex hull areas
 participantNums = range(1,2)
 dwgs = range(1,2)
-highRes = False    # Setting to True will require ~20x processing time
+
+partThresh = 3000  # DWG Viewing Time Threshold (ms)
+partPointMin = 20  # Minimum # of points required to make a part
+
+filePrefix = "BeGaze Data/Raw Data/Participant "
+fileSuffix = ".txt"
 
 
 
@@ -40,276 +38,412 @@ highRes = False    # Setting to True will require ~20x processing time
 
 
 
-
-# Initialize the data variable as global
-allData = 0
-
 # Initialize results
-results = pd.DataFrame(columns = ['period', 'participant', 'dwg',
+results = pd.DataFrame(columns = ['period', 'participant', 'dwg', 'part',
                                   'avgHullArea', 'totalTime'])
 
-# Initialize average
-average = 0
 
-# Initialize finalTime
-finalTime = 0
+# Remove all categories except for "Visual Intake"
+def getVisualIntakes(data):
+    data = data.loc[data['category'] == 'Visual Intake']
+    return data
 
-# Define the doCalculations function
-def doCalculations():
-    # Use the global variables
-    global allData
-    global results
-    global average
-    global finalTime
-    global highRes
+
+# Remove all AOI's that include spools (no '-' or 'white space')
+def getSpools(data):
+    data = data[data['aoi'].str.contains("Spool")]
+    return data
+
+
+def getFloatCoords(data):
+    # Convert coordinates to floats
+    data = data.astype(dtype = {'x': np.float64, 'y': np.float64})
+    return data
+
+
+# Remove combine rows that have the same binocular index
+def getFirstIndices(data):
+    data = data.drop_duplicates(subset = 'index', keep = 'first')
+    return data
+
+
+# Read in the raw BeGaze data files
+def getData(filePrefix, fileSuffix, participantNumTxt):
+    # Data doesn't exist. Read the file.
+    data = pd.read_table(filePrefix + participantNumTxt + fileSuffix,
+                            delimiter = ',')
     
-    for PERIOD in PERIODS:    
-        for participantNum in participantNums:     
-            # Initialize the data variable as global
-            allData = 0
-            # Create a padded string for participantNum
-            participantNumTxt = str(participantNum).zfill(2)        
+    # Rename the columns
+    data.columns = ['recordtime', 'timestamp', 'category',
+                       'index', 'x', 'y', 'aoi']
+        
+    return data
 
-            for dwg in dwgs:
-                print('DWG: ' + str(dwg))
+
+def getCleanData(data):
+    data = getVisualIntakes(data)
+    data = getSpools(data)
+    data = getFloatCoords(data)
+    return data
+
+
+def getDwgData(data, dwgNum):
+    return data.loc[data['aoi'] == 'Spool ' + str(dwgNum)].sort_values(by = ['timestamp'])
+
+
+def getScaledCoordinates(data):
+    min_max_scaler = preprocessing.MinMaxScaler()
     
-                # Create a padded string for dwg
-                dwgTxt = str(dwg).zfill(2)
-                
-                # Only read data file if necessary
-                if type(allData) is int:
-                    print('no data')
-                    # Data doesn't exist. Read the file.
-                    allData = pd.read_table("BeGaze Data/Raw Data/Participant "
-                                            + participantNumTxt
-                                            + ".txt", delimiter = ',')
-                        
-                    # Rename the columns
-                    allData.columns = ['totaltime', 'timestampHMS', 'category',
-                                    'index', 'x', 'y', 'aoi']
-                    
-                    # Keep only the rows for "Visual Intake"
-                    allData = allData.loc[allData['category'] == 'Visual Intake']
-                        
-                    # Select only the x and y coordinates
-                    allPoints = allData.iloc[:, 4:6]
-                    
-                    # Define the getTimeSec function
-                    def getTimeSec(time):
-                        return int(time)/1000
-                    
-                    # Calculate the totaltime in seconds for each row
-                    allData['totaltimesec'] = allData['totaltime'].apply(getTimeSec)
-                    
-                else:
-                    # Data exists. Do NOT read the file.
-                    print('have data already')
-                    
-                # Keep only the rows for the current dwg (AOI)
-                data = allData.loc[allData['aoi'] == 'Spool ' + str(dwg)] 
-                
-                # Only proceed if there are fixations for the dwg
-                if(len(data.index) > 10):
+    # Normalize the coordinates
+    data['x'] = min_max_scaler.fit_transform(data['x'].values.reshape(-1,1))
+    data['y'] = min_max_scaler.fit_transform(data['y'].values.reshape(-1,1))
+    
+    return data
+
+
+def addDurationsCol(data):
+    for i, row in data.iterrows():
+        if i > 0:            
+            duration = data.iloc[i,:]['recordtime'] - data.iloc[i - 1,:]['recordtime']            
+        else:
+            # Just use the timestamp for the very first row
+            duration = data.iloc[i,:]['recordtime']
             
-                    if(not highRes):
-                        # Keep only the first row for each fixation
-                        data = data.drop_duplicates(subset = 'index', keep = 'first')
-                        
-                    data.reset_index(inplace = True)  
+        data.set_value(i, 'duration', duration)
+        
+    return data
+
+
+# Split the data into parts based upon the duration of each fixation
+# If a duration exceeds partThresh (global variable defined by user) then split
+def getDwgParts(data, partThresh, partPointMin):                            
+    partNum = 1
                     
+    # Assign part numbers
+    for i, row in data.iterrows():
+        if data.iloc[i,:]['duration'] > partThresh:
+            data.set_value(i, 'part', 0)
+            partNum += 1
+        
+        else:
+            data.set_value(i, 'part', partNum)
+        
+    totalParts = partNum
+    
+    data = data[data['part'] > 0]
+    
+    # Make an array of parts
+    parts = []
+    
+    # Append the lists of each part
+    for i in range(1, totalParts + 1):
+        thisPart = data[data['part'] == i]
+        thisPart.reset_index(drop=True, inplace=True)
+        del thisPart['part']
+        if(len(thisPart) >= partPointMin):
+            parts.append(thisPart)
+        
+    return parts
+
+
+def getPartTime(data):
+    minTime = data['recordtime'].min()
+    
+    def pt(x):
+        return x['recordtime'] - minTime
+    
+    return data.apply(pt, axis=1)
+
+
+def getStartRow(data, finishRow, period):
+    startRow = False
+    for row in range(finishRow, -1, -1):
+        if data.iloc[finishRow]['partTime'] - data.iloc[row]['partTime'] > period:
+            startRow = row + 1
+            break
+    return startRow
+
+
+def getRowCountStartPeriod(data, period):    
+    for row in range(len(data) - 1, -1, -1):
+        startRow = getStartRow(data, row, period)
+        if(startRow):
+            data.set_value(row, 'startRow', startRow)
+            data.set_value(row, 'rowCount', row - startRow + 1)
+            data.set_value(row, 'period',
+                           data.iloc[row]['partTime'] - data.iloc[startRow]['partTime'])
+            
+    return data
+
+
+# Calculate the convex hulls and hullAreas
+def getConvexHulls(data):
+    for i, row in data.iterrows():
+        if(not np.isnan(row['startRow'])):
+            # Get just the points for calculating the convex hull
+            points = data.iloc[int(row['startRow']):i+1][['x', 'y']]
+            
+            if((int(row['rowCount']) > 2) & (len(points.drop_duplicates()) > 2)):
+            
+                # Calculate the convex hull and save it
+                hull = ConvexHull(points)
+                data.set_value(i, 'hull', hull)
+                data.set_value(i, 'hullArea', hull.volume*100)
+            else:
+                data.set_value(i, 'hullArea', 0)
+                
+    return data
+
+def getPlotPoints(data, frame):
+    plotPoints = []
+    
+    startRow = data.iloc[frame]['startRow']
+    if(not np.isnan(startRow)):    
+        plotPoints = data.iloc[int(startRow):frame+1][['x', 'y']]
+        plotPoints.reset_index(inplace=True)
+        del plotPoints['index']
+    
+    return plotPoints
+    
+    
+def updatePlot(frame, data, startFrame, period, participantNumTxt, dwgNumTxt, partNumTxt):
+    global finalTime
+    global average
+    
+    print('period:' + str(period) + ' participant:' + participantNumTxt + ' dwg:' + dwgNumTxt + ' part:' + partNumTxt + ' frame: ' + str(frame))
+    
+    row = data.iloc[frame]
+    
+    if(row['rowCount'] > 2):
+        plotPoints = getPlotPoints(data, frame)
+        if(len(plotPoints) > 2):
+            if(len(plotPoints.drop_duplicates()) > 2):
+                plotPoints = plotPoints.as_matrix()
+                # Plot the points! Draw the points in the left subplot
+                ax1.cla()
+                ax1.set_xlim([0, 1])
+                ax1.set_ylim([0, 1])
+                ax1.set_xlabel('X Coordinate (normalized)')
+                ax1.set_ylabel('Y Coordinate (normalized)')
+                
+                ax1.plot(plotPoints[:,0], plotPoints[:,1], 'o')
+                
+                for simplex in row['hull'].simplices:
+                    ax1.plot(plotPoints[simplex, 0], plotPoints[simplex, 1], 'k-')
+
+                # Set the subplot title to frameRange
+                ax1.title.set_text('Fixation #\'s: '
+                                   + str(int(row['startRow'])) + ' - '
+                                   + str(frame) + '\nPeriod: ' +
+                                   str(row['period'])[0:6] + ' milliseconds')
+                
+                # Update Right plot
+                if(frame > startFrame):
+                    # Update the x axis limit to include the new data
+                    ax2.set_xlim(left = data.loc[startFrame, 'partTime'],
+                                 right = data.loc[frame, 'partTime'])
                     
-                    # Normalize the points
-                    min_max_scaler = preprocessing.MinMaxScaler()
+                    # Draw AREA line graph in the right subplot
+                    areaLine.set_data(data.loc[startFrame:frame, 'partTime'], 
+                                      data.loc[startFrame:frame, 'hullArea'])
                     
-                    # Normalize the coordinates
-                    data['x'] = min_max_scaler.fit_transform(data['x'])
-                    data['y'] = min_max_scaler.fit_transform(data['y'])
+                    # Update and draw the flat average line
+                    average = np.mean(data.loc[startFrame:frame,'hullArea'])
+                    avgLine.set_data([0, data.loc[frame, 'partTime']],
+                                     [average, average])
                     
-                    # Get just the x and y points
-                    points = data.iloc[:, 5:7]
+                    # Update and move the average line label
+                    avgLabel.set_text(str(average)[0:5] + '%')
+                    avgLabel.set_position((data.loc[frame, 'partTime'], average))
                     
-                    # Define the getStartRow function
-                    def getStartRow(times, finishRow, period):
-                        startRow = False
-                        for row in range(finishRow, -1, -1):
-                            if times.iloc[finishRow] - times.iloc[row] > period:
-                                startRow = row + 1
-                                break
-                        return startRow
+                    # Update the time in the bottom right corner of the right plot
+                    timeLabel.set_position((data.loc[frame, 'partTime'], 0))
+                    timeLabel.set_text(str(row['partTime']/1000)[0:6] + ' seconds')
+                    
+                    finalTime = row['partTime']/1000
+        
+def getStartFrame(data):
+    for i, row in data.iterrows():
+        if(not np.isnan(row['startRow'])):
+            return i
+        
+
+def plotAndSave(data, period, participantNumTxt, dwgNumTxt, partNumTxt):    
+    global fig1
+    global ax1
+    global ax2
+    global areaLine
+    global avgLine
+    global avgLabel
+    global timeLabel
+    global finalTime
+    global average
+    
+    # Set the default size of the plot figure to 12" width x 5" height
+    rcParams['figure.figsize'] = 10, 5
+    
+    # Setup the figure and subplots
+    plt.close("all")
+    fig1, (ax1, ax2) = plt.subplots(1, 2, sharey=False)
+
+    # Increase whitespace between the subplots
+    fig1.subplots_adjust(wspace=0.35)
+    
+    # Set the figure title
+    fig1.suptitle('Participant ' + participantNumTxt + ' - DWG ' + dwgNumTxt
+                  + ' - Part ' + partNumTxt, y=1)
+    
+    # Set Axes labels of the right subplot (the line graph)
+    ax2.set_xlabel('Time (milliseconds)')
+    ax2.set_ylabel('Convex Hull Area (%)')
+    
+    # Set the axis limits for the right subplot
+    ax2.set_xlim([0, 1])
+    ax2.set_ylim([0, 100])
+    
+    # Set the title of the right subplot
+    ax2.title.set_text('Convex Hull Area Over Time')        
+
+    # Initialize the lines for the right subplot
+    areaLine, = ax2.plot([], [], label = 'Convex Hull Area')
+    avgLine, = ax2.plot([], [], linestyle='--', label = 'Average Area')
+    
+    # Initialize the average line label
+    avgLabel = ax2.text(0, 0, '%', horizontalalignment='left',
+                        verticalalignment='center')
+    
+    # Initialize the time label in the bottom right of the right subplot
+    timeLabel = ax2.text(0, 0, '', horizontalalignment='right',
+                         verticalalignment='bottom')
+    
+    # Create the legend in the top right corner of the right subplot
+    ax2.legend(loc=1)
+    
+    # Make a timestamp for unique movie filenames
+    ts = time.time()
+    dt = datetime.datetime.fromtimestamp(ts).strftime('%y%m%d.%H%M%S')
+    
+    startFrame = getStartFrame(data)
+    
+    finalTime = 0
+    average = 0
+    
+    # Animate the plot
+    anim = animation.FuncAnimation(fig1,
+                                   func=updatePlot,
+                                   frames=range(startFrame, len(data)),
+                                   fargs=(data, startFrame, period, participantNumTxt, dwgNumTxt, partNumTxt),
+                                   interval=200,
+                                   repeat=False)
+    
+    anim.save('animations/' + str(period) + '_participant'
+              + participantNumTxt + '_dwg' + dwgNumTxt + '_part' + partNumTxt
+              + '_' + str(dt) + '.mp4', fps=5,
+              extra_args=['-vcodec', 'libx264'])
+    
+    print('finalTime: ' + str(finalTime))
+    
+
+def doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
+                   filePrefix, fileSuffix):
+    
+    global results
+    
+    # Do everything for each period
+    for period in periods:
+        
+        # Do everything for each participant        
+        for participantNum in participantNums:            
+            participantNumTxt = str(participantNum).zfill(2)
+
+            # Get the participant data
+            participantData = getData(filePrefix, fileSuffix, participantNumTxt)
+            # Clean the participant data
+            participantData = getCleanData(participantData)
+
+            # Do everything for each drawing
+            for dwgNum in dwgs:
+                dwgNumTxt = str(dwgNum).zfill(2)
+                
+                dwgData = getDwgData(participantData, dwgNum)
+                
+                dwgData = getFirstIndices(dwgData)
+                
+                dwgData.reset_index(inplace = True)
+                
+                dwgData = getScaledCoordinates(dwgData)
+                
+                dwgData = addDurationsCol(dwgData)
+                
+                dwgParts = getDwgParts(dwgData, partThresh, partPointMin)
+                
+                # Do everything for each drawing part
+                for i in range(0, len(dwgParts)):
+                    partData = dwgParts[i]
+                    
+                    partNum = i+1
+                    partNumTxt = str(partNum).zfill(2)
+                    
+                    partData['partTime'] = getPartTime(partData)
+                    
+                    partData = getRowCountStartPeriod(partData, period)
+                    
+                    partData = getConvexHulls(partData)
+                    
+                    plotAndSave(partData, period, participantNumTxt, dwgNumTxt, partNumTxt)
                        
-                    # Calculate time steps
-                    times = data['totaltime']
-                    
-                    for row in range(len(times) - 1, -1, -1):
-                        startRow = getStartRow(times, row, PERIOD)
-                        if(startRow):
-                            data.set_value(row, 'startRow', startRow)
-                            data.set_value(row, 'rowCount', row - startRow + 1)
-                            data.set_value(row, 'period',
-                                           times.iloc[row] - times.iloc[startRow])
-                    
-                    # Find the first data row with enough data to meet the PERIOD
-                    firstRow = data[data['startRow'] > 0].index.tolist()[0]
-                            
-                    # Set the default size of the plot figure to 12" width x 5" height
-                    rcParams['figure.figsize'] = 10, 5
-                    
-                    # Setup the figure and subplots
-                    plt.close("all")
-                    fig1, (ax1, ax2) = plt.subplots(1, 2, sharey=False)
-                    
-                    # Increase whitespace between the subplots
-                    fig1.subplots_adjust(wspace=0.35)
-                    
-                    # Set the figure title
-                    fig1.suptitle('Participant ' + participantNumTxt + ' - dwg '
-                                  + dwgTxt)
-                    
-                    # Set Axes labels of the right subplot (the line graph)
-                    ax2.set_xlabel('Time (milliseconds)')
-                    ax2.set_ylabel('Convex Hull Area (%)')
-                    
-                    # Set the axis limits for the right subplot
-                    ax2.set_xlim([0, 1])
-                    ax2.set_ylim([0, 100])
-                    
-                    # Set the title of the right subplot
-                    ax2.title.set_text('Convex Hull Area Over Time')        
-                    
-                    # Initialize the lines for the right subplot
-                    areaLine, = ax2.plot([], [], label = 'Convex Hull Area')
-                    avgLine, = ax2.plot([], [], linestyle='--', label = 'Average Area')
-                    
-                    # Initialize the average line label
-                    avgLabel = ax2.text(0, 0, '%', horizontalalignment='left',
-                                        verticalalignment='center')
-                    
-                    # Initialize the time label in the bottom right of the right subplot
-                    timeLabel = ax2.text(0, 0, '', horizontalalignment='right',
-                                         verticalalignment='bottom')
-                    
-                    # Create the legend in the top right corner of the right subplot
-                    ax2.legend(loc=1)
-                        
-                    def update(frame):     
-                        global average
-                        global finalTime
-                        
-                        row = data.iloc[frame,:]
-                        
-                        if(not np.isnan(row['startRow'])):
-                            plotPoints = points[int(row['startRow']):frame+1]
-                            
-                            # Only continue if there are 3 unique points
-                            if((row['rowCount'] > 2) & (len(plotPoints.drop_duplicates()) > 2)):
-                                plotPoints = plotPoints.as_matrix()
-                                
-                                print('PERIOD: ' + str(PERIOD) + '  partic: '
-                                      + participantNumTxt + '  dwg: ' + dwgTxt
-                                      + '  frame: ' + str(frame) + '  len:'
-                                      + str(len(plotPoints))
-                                      + '  enough points')
-                            
-                                # Enough points exist to calculate the hull
-                                # Calculate the convex hull
-                                hull = ConvexHull(plotPoints)
-                                
-                                # Save the hull and hullArea   
-                                data.set_value(frame, 'hull', hull)
-                                data.set_value(frame, 'hullArea', hull.volume*100)
-                            
-                            
-                                # Draw the points in the left subplot
-                                ax1.cla()
-                                ax1.set_xlim([0, 1])
-                                ax1.set_ylim([0, 1])
-                                ax1.set_xlabel('X Coordinate (normalized)')
-                                ax1.set_ylabel('Y Coordinate (normalized)')
-                                
-                                ax1.plot(plotPoints[:,0], plotPoints[:,1], 'o')
-                                
-                                # Draw the convex hull in the left subplot
-                                for simplex in hull.simplices:
-                                    ax1.plot(plotPoints[simplex, 0],
-                                             plotPoints[simplex, 1], 'k-')
-                                
-                            else:
-                                print('PERIOD: ' + str(PERIOD) +'  partic: '
-                                      + participantNumTxt + '  dwg: ' + dwgTxt
-                                      + '  frame: ' + str(frame) + '  len:'
-                                      + str(len(plotPoints))
-                                      + '  NOT ENOUGH POINTS!!!')
-                                
-                                # Not enough points to calculat the hull, set area to zero
-                                data.set_value(frame, 'hullArea', 0)
-                            
-                            
-                            # Draw AREA line graph in the right subplot
-                            areaLine.set_data(data.loc[firstRow:frame,'totaltime'], 
-                                              data.loc[firstRow:frame,'hullArea'])
-                            
-                            # get the frameRange
-                            frameRange = 'Fixations: ' + str(firstRow) + '-' + str(frame)
-                            
-                            # Set the subplot title to frameRange
-                            ax1.title.set_text('Fixation #\'s: '
-                                               + str(int(row['startRow'])) + ' - '
-                                               + str(frame) + '\nPeriod: ' +
-                                               str(row['period'])[0:6] + ' milliseconds')
-                            
-                            # Update the x axis limit to include the new data
-                            ax2.set_xlim([data.loc[firstRow, 'totaltime'],
-                                          data.loc[frame, 'totaltime']])
-                            
-                            # Update and draw the flat average line
-                            average = np.mean(data.loc[firstRow:frame,'hullArea'])
-                            avgLine.set_data([0, data.loc[frame, 'totaltime']],
-                                             [average, average])
-                            
-                            # Update and move the average line label
-                            avgLabel.set_text(str(average)[0:5] + '%')
-                            avgLabel.set_position((data.loc[frame, 'totaltime'], average))
-                            
-                            # Update the time in the bottom right corner of the right plot
-                            timeLabel.set_position((data.loc[frame, 'totaltime'], 0))        
-                            timeLabel.set_text(str(row['totaltimesec'])[0:6] + ' seconds')
-                            
-                            finalTime = row['totaltimesec']
-                    
-                    
-                    # Animate the plots
-                    anim = animation.FuncAnimation(fig1,
-                                                        func=update,
-                                                        frames=range(firstRow, len(data)),
-                                                        fargs=None,
-                                                        interval=200,
-                                                        repeat=False)
-                    
-                    # Make a timestamp for unique movie filenames
-                    ts = time.time()
-                    dt = datetime.datetime.fromtimestamp(ts).strftime('%y%m%d.%H%M%S')
-                    
-                    
-                    anim.save('animations/' + str(PERIOD) + '_participant'
-                              + participantNumTxt + '_dwg' + dwgTxt + '_'
-                              + str(dt) + '.mp4', fps=5,
-                              extra_args=['-vcodec', 'libx264'])
-                    
                     # Append this result to results
-                    result = {'period': PERIOD,
+                    result = {'period': period,
                               'participant': participantNum,
-                              'dwg': dwg,
+                              'dwg': dwgNum,
+                              'part': partNum,
                               'avgHullArea': average,
                               'totalTime': finalTime}
                     
                     results = results.append(result, ignore_index=True)
                     
+    # Make a timestamp for unique movie filenames
+    ts = time.time()
+    dt = datetime.datetime.fromtimestamp(ts).strftime('%y%m%d.%H%M%S')
+    
     # Write results to excel file
     writer = pd.ExcelWriter('results' + str(dt) + '.xlsx',
                             engine='xlsxwriter')
     
     results.to_excel(writer, sheet_name='Sheet1')
     writer.save()
+                    
 
-# Finally, do the calculations
-doCalculations()
+# Finally, call doCalculations
+doCalculations(periods, participantNums, dwgs, partThresh, partPointMin, filePrefix,
+               fileSuffix)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#########
+######### for testing only
+#########
+
+period=3000
+participantNum=1
+dwgNum=1
+partNum=1
+i=0
+data=partData
+frame=12
+startFrame=7
+
+#########
+######### for testing only
+#########
