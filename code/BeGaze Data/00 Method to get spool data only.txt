@@ -1,0 +1,10 @@
+1. Delete all columns except
+	RecordingTime [ms]
+	Time of Day [h:m:s:ms]
+	Category Binocular
+	Index Binocular
+	Point of Regard Binocular X [px]
+	Point of Regard Binocular Y [px]
+	AOI Name Binocular
+
+2. Save as "Participant XX.xlsx"
