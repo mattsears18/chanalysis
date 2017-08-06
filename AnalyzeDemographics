@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Aug  6 15:48:38 2017
+
+@author: mattsears
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats
+
+filepath = 'results/resultsDemographics.xlsx'
+imagePath = 'results/images/'
+
+results = pd.read_excel(filepath)
+
+# Get rid of useless columns
+del results['participant']
+del results['pid']
+del results['omarTime']
+del results['cognitionHighLow']
+del results['training']
+
+def getCorr(x, y):    
+    # Calculate correlation and p-value
+    r,p = stats.pearsonr(x, y)
+    r2 = r**2
+    n = len(x)
+    return r,p,n
+
+tests = []
+
+for var in results:
+    for var2 in results:
+        if var != var2:
+            tests.append((var, var2))
+            
+testResults = pd.DataFrame(columns = ['test', 'r2', 'r', 'p', 'n'])
+
+for test in tests:
+    r,p,n = getCorr(results[test[0]], results[test[1]])
+    test = test[0] + ' vs ' + test[1]
+    
+    result = {'test': test, 'r2': r**2, 'r': r, 'p': p, 'n': n}
+    
+    testResults = testResults.append(result, ignore_index=True)
+    
+    print('')
+    print('Test:  ' + test[0] + ' vs ' + test[1])
+    print('R^2 = ' + str(r**2) + ',  r = ' + str(r) + ',  p = ' + str(p) + ',  n = ' + str(n))
