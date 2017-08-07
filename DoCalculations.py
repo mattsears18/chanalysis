@@ -17,7 +17,8 @@ from pylab import rcParams
 from sklearn import preprocessing
 
 
-periods = [15000]  # Time periods (in ms) to calculate convex hull areas
+# Time periods (in ms) to calculate convex hull areas
+periods = [4000, 6000, 8000, 12000]
 participantNums = range(1, 21)
 dwgs = range(1, 11)
 
@@ -412,8 +413,8 @@ def doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
                     if(partData['startRow'].nunique() > 0):
                         partData = getConvexHulls(partData)
                         
-                        plotAndSave(partData, period, participantNumTxt, dwgNumTxt,
-                                    partNumTxt)
+                        plotAndSave(partData, period, participantNumTxt,
+                                    dwgNumTxt, partNumTxt)
                            
                         # Append this result to results
                         result = {'period': period,
@@ -470,13 +471,13 @@ doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
 ######### for testing only
 #########
 
-period=15000
-participantNum=1
-dwgNum=2
-i=2
-data=partData
-frame=12
-startFrame=7
+#period=15000
+#participantNum=1
+#dwgNum=2
+#i=2
+#data=partData
+#frame=12
+#startFrame=7
 
 #########
 ######### for testing only

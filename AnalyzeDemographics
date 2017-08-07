@@ -33,17 +33,18 @@ def getCorr(x, y):
 tests = []
 
 for var in results:
-    for var2 in results:
-        if var != var2:
-            tests.append((var, var2))
+    if 'HullArea' in var:
+        for var2 in results:
+            if not 'HullArea' in var2:
+                tests.append((var, var2))
             
 testResults = pd.DataFrame(columns = ['test', 'r2', 'r', 'p', 'n'])
 
 for test in tests:
     r,p,n = getCorr(results[test[0]], results[test[1]])
-    test = test[0] + ' vs ' + test[1]
+    t = test[0] + ' vs ' + test[1]
     
-    result = {'test': test, 'r2': r**2, 'r': r, 'p': p, 'n': n}
+    result = {'test': t, 'r2': r**2, 'r': r, 'p': p, 'n': n}
     
     testResults = testResults.append(result, ignore_index=True)
     
