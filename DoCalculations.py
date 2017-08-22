@@ -18,15 +18,17 @@ from sklearn import preprocessing
 
 
 # Time periods (in ms) to calculate convex hull areas
-periods = [4000, 6000, 8000, 12000]
+periods = [3000]
 participantNums = range(1, 21)
 dwgs = range(1, 11)
 
 partThresh = 5000  # DWG Viewing Time Threshold (ms)
 partPointMin = 20  # Minimum # of points required to make a part
 
-filePrefix = "BeGaze Data/Raw Data/Participant "
-fileSuffix = ".txt"
+imagePath = 'results/images/'
+
+filePrefix = 'BeGaze Data/Raw Data/Participant '
+fileSuffix = '.txt'
 
 # Convex hull areas smaller than detailThresh are considered "detailed viewing"
 # while convex hull areas larger than detailThresh are considered
@@ -288,7 +290,7 @@ def getStartFrame(data):
             return i
         
 
-def plotAndSave(data, period, participantNumTxt, dwgNumTxt, partNumTxt):    
+def plotAnimationAndSave(data, period, participantNumTxt, dwgNumTxt, partNumTxt):    
     global fig1
     global ax1
     global ax2
@@ -299,7 +301,7 @@ def plotAndSave(data, period, participantNumTxt, dwgNumTxt, partNumTxt):
     global finalTime
     global average
     
-    # Set the default size of the plot figure to 12" width x 5" height
+    # Set the default size of the plot figure to 10" width x 5" height
     rcParams['figure.figsize'] = 10, 5
     
     # Setup the figure and subplots
@@ -363,6 +365,30 @@ def plotAndSave(data, period, participantNumTxt, dwgNumTxt, partNumTxt):
               + '_' + str(dt) + '.mp4', fps=5,
               extra_args=['-vcodec', 'libx264'])
     
+def plotHistogramAndSave(data, title, filename, period, participantNumTxt, dwgNumTxt, partNumTxt): 
+    global imagePath
+    global fig2
+    
+    print('HISTOGRAM period:' + str(period) + ' participant:'
+          + participantNumTxt + ' dwg:' + dwgNumTxt + ' part:' + partNumTxt)
+    
+    x = data[np.isfinite(data['hullArea'])]['hullArea'].as_matrix()
+    
+    fig2 = plt.figure()
+    
+    n, bins, patches = plt.hist(x, 'auto', normed=1, alpha=0.75)
+    
+    plt.xlabel('Convex Hull Area (%)')
+    plt.ylabel('Probability')
+    plt.title(title, y=1)
+    plt.xlim(0)
+    plt.grid(True)
+
+    # Save to plot
+    plt.savefig((imagePath + filename))
+    
+    plt.close("all")
+    
 
 def doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
                    filePrefix, fileSuffix):
@@ -405,16 +431,31 @@ def doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
                     partNum = i+1
                     partNumTxt = str(partNum).zfill(2)
                     
-                    partData['partTime'] = getPartTime(partData)
+                    if(not 'partTime' in partData):
+                        partData['partTime'] = getPartTime(partData)
+                        
                     
-                    partData = getRowCountStartPeriod(partData, period)
-                    
+                    if(not 'startRow' in partData):
+                        partData = getRowCountStartPeriod(partData, period)
+
                     # Don't calculate convex hulls unless there's enough data
                     if(partData['startRow'].nunique() > 0):
-                        partData = getConvexHulls(partData)
+                        if(not 'hull' in partData):                    
+                            partData = getConvexHulls(partData)
                         
-                        plotAndSave(partData, period, participantNumTxt,
-                                    dwgNumTxt, partNumTxt)
+                        plotAnimationAndSave(partData, period,
+                                             participantNumTxt, dwgNumTxt,
+                                             partNumTxt)
+                        
+                        title = ('Convex Hull Area Distribution\n Participant '
+                                 + participantNumTxt + ' - DWG ' + dwgNumTxt
+                                 + ' - Part ' + partNumTxt)
+              
+                        filename = ('Histogram_' + str(period) + '_participant'
+                                    + participantNumTxt + '_dwg' + '_part'
+                                    + partNumTxt + '.png')
+                        
+                        plotHistogramAndSave(partData, title, filename, period, participantNumTxt, dwgNumTxt, partNumTxt)
                            
                         # Append this result to results
                         result = {'period': period,
@@ -471,10 +512,10 @@ doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
 ######### for testing only
 #########
 
-#period=15000
-#participantNum=1
-#dwgNum=2
-#i=2
+#period=10000
+#participantNum=2
+#dwgNum=3
+#i=0
 #data=partData
 #frame=12
 #startFrame=7

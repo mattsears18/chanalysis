@@ -28,10 +28,12 @@ results = pd.read_excel(filepath)
 
 
 
+# Filter Period
+#results = results.loc[results['period'] == 12000]
 # Filter Participants
-results = results.loc[results['participant'].isin([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20])]
+#results = results.loc[results['participant'].isin([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20])]
 # Filter Drawings
-results = results.loc[results['dwg'].isin([1,2,3,4,5,6,7,8,9,10])]
+#results = results.loc[results['dwg'].isin([1,2,3,4,5,6,7,8,9,10])]
 
 
 ### DRAWING STATS
@@ -112,13 +114,14 @@ for name, group in groupedParticipant:
     
     resultsParticipant = resultsParticipant.append(result, ignore_index=True)
   
-
+"""
 # Save new results
 writer = pd.ExcelWriter('results/results.xlsx',
                         engine='xlsxwriter')
 
 results.to_excel(writer, sheet_name='Sheet1')
 writer.save()
+"""
 
 # Save new resultsParticipant
 writer = pd.ExcelWriter('results/resultsParticipant.xlsx',
