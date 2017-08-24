@@ -11,6 +11,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import animation
 from scipy.spatial import ConvexHull
+from scipy.misc import imread
 import time
 import datetime
 from pylab import rcParams
@@ -19,7 +20,7 @@ from sklearn import preprocessing
 
 # Time periods (in ms) to calculate convex hull areas
 periods = [3000]
-participantNums = range(1, 21)
+participantNums = range(16, 17)
 dwgs = range(1, 11)
 
 partThresh = 5000  # DWG Viewing Time Threshold (ms)
@@ -245,6 +246,10 @@ def updatePlot(frame, data, startFrame, period, participantNumTxt,
                 ax1.set_xlabel('X Coordinate (normalized)')
                 ax1.set_ylabel('Y Coordinate (normalized)')
                 
+                # Set the Left plot background to the reference image
+                img = imread('referenceImages/DWG' + dwgNumTxt + '.png')
+                ax1.imshow(img, zorder=0, extent=[0,1,0,1], aspect='auto')
+                
                 ax1.plot(plotPoints[:,0], plotPoints[:,1], 'o')
                 
                 for simplex in row['hull'].simplices:
@@ -307,17 +312,19 @@ def plotAnimationAndSave(data, period, participantNumTxt, dwgNumTxt, partNumTxt)
     # Setup the figure and subplots
     plt.close("all")
     fig1, (ax1, ax2) = plt.subplots(1, 2, sharey=False)
+    
+    fig1.tight_layout(rect=[0.03, 0.05, 0.96, 0.85])
 
     # Increase whitespace between the subplots
     fig1.subplots_adjust(wspace=0.35)
     
     # Set the figure title
     fig1.suptitle('Participant ' + participantNumTxt + ' - DWG ' + dwgNumTxt
-                  + ' - Part ' + partNumTxt, y=1)
+                  + ' - Part ' + partNumTxt, y=0.96, fontweight='bold')
     
     # Set Axes labels of the right subplot (the line graph)
     ax2.set_xlabel('Time (milliseconds)')
-    ax2.set_ylabel('Convex Hull Area (%)')
+    ax2.set_ylabel('Convex Hull Area (%)') 
     
     # Set the axis limits for the right subplot
     ax2.set_xlim([0, 1])
@@ -362,7 +369,7 @@ def plotAnimationAndSave(data, period, participantNumTxt, dwgNumTxt, partNumTxt)
     
     anim.save('results/animations/' + str(period) + '_participant'
               + participantNumTxt + '_dwg' + dwgNumTxt + '_part' + partNumTxt
-              + '_' + str(dt) + '.mp4', fps=5,
+              + '.mp4', fps=5, bitrate=300,
               extra_args=['-vcodec', 'libx264'])
     
 def plotHistogramAndSave(data, title, filename, period, participantNumTxt, dwgNumTxt, partNumTxt): 
@@ -385,7 +392,7 @@ def plotHistogramAndSave(data, title, filename, period, participantNumTxt, dwgNu
     plt.grid(True)
 
     # Save to plot
-    plt.savefig((imagePath + filename))
+    plt.savefig((imagePath + '/Histograms/' + filename))
     
     plt.close("all")
     
@@ -466,6 +473,14 @@ def doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
                                   'partTime': finalTime}
                         
                         results = results.append(result, ignore_index=True)
+                        
+                                            
+                        # Write results to excel file
+                        writer = pd.ExcelWriter('results/results.xlsx',
+                                                engine='xlsxwriter')
+                        
+                        results.to_excel(writer, sheet_name='Sheet1')
+                        writer.save()
                
     
     # Change dtype to integers            
@@ -475,13 +490,6 @@ def doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
     # Make a timestamp for unique movie filenames
     ts = time.time()
     dt = datetime.datetime.fromtimestamp(ts).strftime('%y%m%d.%H%M%S')
-    
-    # Write results to excel file
-    writer = pd.ExcelWriter('results/results.xlsx',
-                            engine='xlsxwriter')
-    
-    results.to_excel(writer, sheet_name='Sheet1')
-    writer.save()
     
     
     # Write results to excel file but save name with current date and time
@@ -512,9 +520,9 @@ doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
 ######### for testing only
 #########
 
-#period=10000
-#participantNum=2
-#dwgNum=3
+#period=3000
+#participantNum=19
+#dwgNum=4
 #i=0
 #data=partData
 #frame=12
