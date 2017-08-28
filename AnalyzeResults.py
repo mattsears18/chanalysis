@@ -70,10 +70,10 @@ for name, group in groupedDwg:
     participantNum = name[1]
     dwgNum = name[2]
     
-    dwgTime = getSum(group, 'partTime')
+    dwgTime = getSum(group, 'viewingTime')
     dwgTimeLn = np.log(dwgTime)
     
-    dwgAvgHullArea = getWeightedAverage(group, 'partAvgHullArea', 'partTime')
+    dwgAvgHullArea = getWeightedAverage(group, 'viewingAvgHullArea', 'viewingTime')
     
     result = {'period': period, 'participant': participantNum,
               'dwg': dwgNum, 'dwgAvgHullArea': dwgAvgHullArea,
@@ -99,10 +99,10 @@ for name, group in groupedParticipant:
     period = name[0]
     participantNum = name[1]
     
-    participantTime = getSum(group, 'partTime')
+    participantTime = getSum(group, 'viewingTime')
     
-    participantAvgHullArea = getWeightedAverage(group, 'partAvgHullArea',
-                                                'partTime')
+    participantAvgHullArea = getWeightedAverage(group, 'viewingAvgHullArea',
+                                                'viewingTime')
     
     result = {'period': period, 'participant': participantNum,
               'dwg': dwgNum, 'participantAvgHullArea': participantAvgHullArea,
@@ -189,14 +189,14 @@ plotAndSave(x = resultsDwg['dwgAvgHullArea'],
             filename = periodTxt + '_byDrawing_all.png')
 
 """
-# Plot the DrawingPart Results
-plotAndSave(x = results['partAvgHullArea'],
-            y = results['partTime'],
-            pointLabel = 'Drawing Part',
+# Plot the DrawingViewing Results
+plotAndSave(x = results['viewingAvgHullArea'],
+            y = results['viewingTime'],
+            pointLabel = 'Drawing Viewing',
             xLabel = 'Average Convex Hull Area (' + str(periodSec) + ' second period)',
-            yLabel = 'Time to Completion (s) (Drawing Part)',
-            title ='Results by Drawing Part\n(All Participants, All Drawings) (' + str(periodSec) + ' second Period)',
-            filename = periodTxt + '_byDrawingPart_all.png')
+            yLabel = 'Time to Completion (s) (Drawing Viewing)',
+            title ='Results by Drawing Viewing\n(All Participants, All Drawings) (' + str(periodSec) + ' second Period)',
+            filename = periodTxt + '_byDrawingViewing_all.png')
 
 
 # Make a plot for each participant

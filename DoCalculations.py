@@ -23,8 +23,8 @@ periods = [3000]
 participantNums = range(16, 17)
 dwgs = range(1, 11)
 
-partThresh = 5000  # DWG Viewing Time Threshold (ms)
-partPointMin = 20  # Minimum # of points required to make a part
+viewingThresh = 5000  # DWG Viewing Time Threshold (ms)
+viewingPointMin = 20  # Minimum # of points required to make a viewing
 
 imagePath = 'results/images/'
 
@@ -50,8 +50,8 @@ detailThresh = 0.10 # Set threshold to 10%
 
 
 # Initialize results
-results = pd.DataFrame(columns = ['period', 'participant', 'dwg', 'part',
-                                  'partAvgHullArea', 'partTime',
+results = pd.DataFrame(columns = ['period', 'participant', 'dwg', 'viewing',
+                                  'viewingAvgHullArea', 'viewingTime',
                                   'dwgAvgHullArea', 'dwgTime',
                                   'participantAvgHullArea', 'participantTime'])
 
@@ -128,39 +128,39 @@ def addDurationsCol(data):
     return data
 
 
-# Split the data into parts based upon the duration of each fixation
-# If a duration exceeds partThresh (global variable defined by user) then split
-def getDwgParts(data, partThresh, partPointMin):                            
-    partNum = 1
+# Split the data into viewings based upon the duration of each fixation
+# If a duration exceeds viewingThresh (global variable defined by user) then split
+def getDwgViewings(data, viewingThresh, viewingPointMin):                            
+    viewingNum = 1
                     
-    # Assign part numbers
+    # Assign viewing numbers
     for i, row in data.iterrows():
-        if data.iloc[i,:]['duration'] > partThresh:
-            data.set_value(i, 'part', 0)
-            partNum += 1
+        if data.iloc[i,:]['duration'] > viewingThresh:
+            data.set_value(i, 'viewing', 0)
+            viewingNum += 1
         
         else:
-            data.set_value(i, 'part', partNum)
+            data.set_value(i, 'viewing', viewingNum)
         
-    totalParts = partNum
+    totalViewings = viewingNum
     
-    data = data[data['part'] > 0]
+    data = data[data['viewing'] > 0]
     
-    # Make an array of parts
-    parts = []
+    # Make an array of viewings
+    viewings = []
     
-    # Append the lists of each part
-    for i in range(1, totalParts + 1):
-        thisPart = data[data['part'] == i]
-        thisPart.reset_index(drop=True, inplace=True)
-        del thisPart['part']
-        if(len(thisPart) >= partPointMin):
-            parts.append(thisPart)
+    # Append the lists of each viewing
+    for i in range(1, totalViewings + 1):
+        thisViewing = data[data['viewing'] == i]
+        thisViewing.reset_index(drop=True, inplace=True)
+        del thisViewing['viewing']
+        if(len(thisViewing) >= viewingPointMin):
+            viewings.append(thisViewing)
         
-    return parts
+    return viewings
 
 
-def getPartTime(data):
+def getViewingTime(data):
     minTime = data['recordtime'].min()
     
     def pt(x):
@@ -172,7 +172,7 @@ def getPartTime(data):
 def getStartRow(data, finishRow, period):
     startRow = False
     for row in range(finishRow, -1, -1):
-        if data.iloc[finishRow]['partTime'] - data.iloc[row]['partTime'] > period:
+        if data.iloc[finishRow]['viewingTime'] - data.iloc[row]['viewingTime'] > period:
             startRow = row + 1
             break
     return startRow
@@ -185,7 +185,7 @@ def getRowCountStartPeriod(data, period):
             data.set_value(row, 'startRow', startRow)
             data.set_value(row, 'rowCount', row - startRow + 1)
             data.set_value(row, 'period',
-                           data.iloc[row]['partTime'] - data.iloc[startRow]['partTime'])
+                           data.iloc[row]['viewingTime'] - data.iloc[startRow]['viewingTime'])
         else:
             data.set_value(row, 'startRow', np.nan)
             data.set_value(row, 'rowCount', np.nan)
@@ -224,12 +224,12 @@ def getPlotPoints(data, frame):
     
     
 def updatePlot(frame, data, startFrame, period, participantNumTxt,
-               dwgNumTxt, partNumTxt):
+               dwgNumTxt, viewingNumTxt):
     global finalTime
     global average
     
     print('period:' + str(period) + ' participant:' + participantNumTxt
-          + ' dwg:' + dwgNumTxt + ' part:' + partNumTxt
+          + ' dwg:' + dwgNumTxt + ' viewing:' + viewingNumTxt
           + ' frame: ' + str(frame))
     
     row = data.iloc[frame]
@@ -265,29 +265,29 @@ def updatePlot(frame, data, startFrame, period, participantNumTxt,
                 # Update Right plot
                 if(frame > startFrame):
                     # Update the x axis limit to include the new data
-                    ax2.set_xlim(left = data.loc[startFrame, 'partTime'],
-                                 right = data.loc[frame, 'partTime'])
+                    ax2.set_xlim(left = data.loc[startFrame, 'viewingTime'],
+                                 right = data.loc[frame, 'viewingTime'])
                     
                     # Draw AREA line graph in the right subplot
-                    areaLine.set_data(data.loc[startFrame:frame, 'partTime'], 
+                    areaLine.set_data(data.loc[startFrame:frame, 'viewingTime'], 
                                       data.loc[startFrame:frame, 'hullArea'])
                     
                     # Update and draw the flat average line
                     average = np.mean(data.loc[startFrame:frame,'hullArea'])
-                    avgLine.set_data([0, data.loc[frame, 'partTime']],
+                    avgLine.set_data([0, data.loc[frame, 'viewingTime']],
                                      [average, average])
                     
                     # Update and move the average line label
                     avgLabel.set_text(str(average)[0:5] + '%')
-                    avgLabel.set_position((data.loc[frame, 'partTime'],
+                    avgLabel.set_position((data.loc[frame, 'viewingTime'],
                                            average))
                     
                     # Update the time in the bottom right corner of the plot
-                    timeLabel.set_position((data.loc[frame, 'partTime'], 0))
-                    timeLabel.set_text(str(row['partTime']/1000)[0:6]
+                    timeLabel.set_position((data.loc[frame, 'viewingTime'], 0))
+                    timeLabel.set_text(str(row['viewingTime']/1000)[0:6]
                                         + ' seconds')
                     
-                    finalTime = row['partTime']/1000
+                    finalTime = row['viewingTime']/1000
         
 def getStartFrame(data):
     for i, row in data.iterrows():
@@ -295,7 +295,7 @@ def getStartFrame(data):
             return i
         
 
-def plotAnimationAndSave(data, period, participantNumTxt, dwgNumTxt, partNumTxt):    
+def plotAnimationAndSave(data, period, participantNumTxt, dwgNumTxt, viewingNumTxt):    
     global fig1
     global ax1
     global ax2
@@ -320,7 +320,7 @@ def plotAnimationAndSave(data, period, participantNumTxt, dwgNumTxt, partNumTxt)
     
     # Set the figure title
     fig1.suptitle('Participant ' + participantNumTxt + ' - DWG ' + dwgNumTxt
-                  + ' - Part ' + partNumTxt, y=0.96, fontweight='bold')
+                  + ' - Viewing ' + viewingNumTxt, y=0.96, fontweight='bold')
     
     # Set Axes labels of the right subplot (the line graph)
     ax2.set_xlabel('Time (milliseconds)')
@@ -363,21 +363,21 @@ def plotAnimationAndSave(data, period, participantNumTxt, dwgNumTxt, partNumTxt)
                                    frames=range(startFrame, len(data)),
                                    fargs=(data, startFrame, period,
                                           participantNumTxt, dwgNumTxt,
-                                          partNumTxt),
+                                          viewingNumTxt),
                                    interval=200,
                                    repeat=False)
     
     anim.save('results/animations/' + str(period) + '_participant'
-              + participantNumTxt + '_dwg' + dwgNumTxt + '_part' + partNumTxt
+              + participantNumTxt + '_dwg' + dwgNumTxt + '_viewing' + viewingNumTxt
               + '.mp4', fps=5, bitrate=300,
               extra_args=['-vcodec', 'libx264'])
     
-def plotHistogramAndSave(data, title, filename, period, participantNumTxt, dwgNumTxt, partNumTxt): 
+def plotHistogramAndSave(data, title, filename, period, participantNumTxt, dwgNumTxt, viewingNumTxt): 
     global imagePath
     global fig2
     
     print('HISTOGRAM period:' + str(period) + ' participant:'
-          + participantNumTxt + ' dwg:' + dwgNumTxt + ' part:' + partNumTxt)
+          + participantNumTxt + ' dwg:' + dwgNumTxt + ' viewing:' + viewingNumTxt)
     
     x = data[np.isfinite(data['hullArea'])]['hullArea'].as_matrix()
     
@@ -397,7 +397,7 @@ def plotHistogramAndSave(data, title, filename, period, participantNumTxt, dwgNu
     plt.close("all")
     
 
-def doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
+def doCalculations(periods, participantNums, dwgs, viewingThresh, viewingPointMin,
                    filePrefix, fileSuffix):
     
     global results
@@ -429,48 +429,48 @@ def doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
                 
                 dwgData = addDurationsCol(dwgData)
                 
-                dwgParts = getDwgParts(dwgData, partThresh, partPointMin)
+                dwgViewings = getDwgViewings(dwgData, viewingThresh, viewingPointMin)
                 
-                # Do everything for each drawing part
-                for i in range(0, len(dwgParts)):
-                    partData = dwgParts[i]
+                # Do everything for each drawing viewing
+                for i in range(0, len(dwgViewings)):
+                    viewingData = dwgViewings[i]
                     
-                    partNum = i+1
-                    partNumTxt = str(partNum).zfill(2)
+                    viewingNum = i+1
+                    viewingNumTxt = str(viewingNum).zfill(2)
                     
-                    if(not 'partTime' in partData):
-                        partData['partTime'] = getPartTime(partData)
+                    if(not 'viewingTime' in viewingData):
+                        viewingData['viewingTime'] = getViewingTime(viewingData)
                         
                     
-                    if(not 'startRow' in partData):
-                        partData = getRowCountStartPeriod(partData, period)
+                    if(not 'startRow' in viewingData):
+                        viewingData = getRowCountStartPeriod(viewingData, period)
 
                     # Don't calculate convex hulls unless there's enough data
-                    if(partData['startRow'].nunique() > 0):
-                        if(not 'hull' in partData):                    
-                            partData = getConvexHulls(partData)
+                    if(viewingData['startRow'].nunique() > 0):
+                        if(not 'hull' in viewingData):                    
+                            viewingData = getConvexHulls(viewingData)
                         
-                        plotAnimationAndSave(partData, period,
+                        plotAnimationAndSave(viewingData, period,
                                              participantNumTxt, dwgNumTxt,
-                                             partNumTxt)
+                                             viewingNumTxt)
                         
                         title = ('Convex Hull Area Distribution\n Participant '
                                  + participantNumTxt + ' - DWG ' + dwgNumTxt
-                                 + ' - Part ' + partNumTxt)
+                                 + ' - Viewing ' + viewingNumTxt)
               
                         filename = ('Histogram_' + str(period) + '_participant'
-                                    + participantNumTxt + '_dwg' + '_part'
-                                    + partNumTxt + '.png')
+                                    + participantNumTxt + '_dwg' + '_viewing'
+                                    + viewingNumTxt + '.png')
                         
-                        plotHistogramAndSave(partData, title, filename, period, participantNumTxt, dwgNumTxt, partNumTxt)
+                        plotHistogramAndSave(viewingData, title, filename, period, participantNumTxt, dwgNumTxt, viewingNumTxt)
                            
                         # Append this result to results
                         result = {'period': period,
                                   'participant': participantNum,
                                   'dwg': dwgNum,
-                                  'part': partNum,
-                                  'partAvgHullArea': average,
-                                  'partTime': finalTime}
+                                  'viewing': viewingNum,
+                                  'viewingAvgHullArea': average,
+                                  'viewingTime': finalTime}
                         
                         results = results.append(result, ignore_index=True)
                         
@@ -485,7 +485,7 @@ def doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
     
     # Change dtype to integers            
     results = results.astype(dtype = {'period': np.int, 'participant': np.int,
-                                      'dwg': np.int, 'part': np.int})
+                                      'dwg': np.int, 'viewing': np.int})
     
     # Make a timestamp for unique movie filenames
     ts = time.time()
@@ -500,7 +500,7 @@ def doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
     writerBackup.save()            
 
 # Finally, call doCalculations
-doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
+doCalculations(periods, participantNums, dwgs, viewingThresh, viewingPointMin,
                filePrefix, fileSuffix)
 
 
@@ -524,7 +524,7 @@ doCalculations(periods, participantNums, dwgs, partThresh, partPointMin,
 #participantNum=19
 #dwgNum=4
 #i=0
-#data=partData
+#data=viewingData
 #frame=12
 #startFrame=7
 
